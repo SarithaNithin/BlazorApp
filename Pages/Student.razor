@@ -1,0 +1,191 @@
+﻿@page "/student"
+
+
+@using DataLibrary
+@using BlazorApp.Models
+@inject IDataAccess _data
+@inject IConfiguration _config
+
+
+<h3> Student Entry Page </h3>
+
+<div class="form-row">
+    <div class="form-group col-md-4 mb-3">
+        <label for="name">Name</label>
+        <input type="text" class="form-control" id="name" @bind="students.Name">
+    </div>
+
+    <div class="form-group  col-md-4 mb-3">
+        <label for="class">Class</label>
+        <select class="form-control" id="class" @bind="students.ClassName">
+            <option value="">Select</option>
+            @foreach (var classOption in classOptions)
+            {
+                <option value="@classOption">@classOption</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group  col-md-4 mb-3">
+        <label for="division">Division</label>
+        <select class="form-control" id="division" @bind="students.DivName">
+            <option value="">Select</option>
+            @foreach (var divisionOption in divisionOptions)
+            {
+                <option value="@divisionOption">@divisionOption</option>
+            }>
+        </select>
+    </div>
+</div>
+<div class="form-group row">
+    <div class="col-sm-2">
+        <button class="btn btn-primary" @onclick="InsertUserInputData" disabled="@IsRegisterButtonDisabled">Register</button>
+    </div>
+</div>
+@if(student == null)
+{
+    <p>
+        <em>Loading..........</em>
+    </p>
+} 
+else
+{
+    <table class="table table-hover table-striped">
+        <thead>
+            <tr>
+                <th>No.</th>
+                <th>Name</th>
+                <th>Class</th>
+                <th>Division</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var (s, index) in student.Select((s, index) => (s, index)))
+        {
+            <tr>
+                <td>@(index + 1)</td>
+                    <td>
+                        @if (s.Id == editedStudentId)
+                        {
+                            <input type="text" @bind="editedStudent.Name" />
+                        }
+                        else
+                        {
+                            @s.Name
+                        }
+                    </td>
+                    <td>
+                        @if (s.Id == editedStudentId)
+                        {
+                            <select class="form-control" @bind="editedStudent.ClassName">
+                                @foreach (var classOption in classOptions)
+                                {
+                                    <option value="@classOption">@classOption</option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            @s.ClassName
+                        }
+                    </td>
+                    <td>
+                        @if (s.Id == editedStudentId)
+                        {
+                            <select class="form-control" @bind="editedStudent.DivName">
+                                @foreach (var divisionOption in divisionOptions)
+                                {
+                                    <option value="@divisionOption">@divisionOption</option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            @s.DivName
+                        }
+                    </td>
+                    <td>
+                        @if (s.Id == editedStudentId)
+                        {
+                            <button class="btn btn-success btn-sm" @onclick="() => SaveUpdatedData(s.Id)">Save</button>
+                            <button class="btn btn-secondary btn-sm" @onclick="CancelEdit">Cancel</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-success btn-sm" @onclick="() => StartEdit(s)">Edit</button>
+                            <button class="btn btn-danger btn-sm" @onclick="() => DeleteData(s.Id)">Delete</button>
+                        }
+                    </td>
+            </tr>
+        }
+
+        </tbody>
+    </table>
+}
+
+@code {
+
+    List<StudentModel>? student;
+    /* Drop down list options*/
+    private string[] classOptions = { "KG1", "KG2", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" };
+    private string[] divisionOptions = { "A", "B", "C", "D", "E", "F", "G" };
+
+    /* For to list the student data */
+    protected override async Task OnInitializedAsync()
+    {
+        string sql = "select * from student;";
+        student = await _data.LoadData<StudentModel, dynamic>(sql, new { }, _config.GetConnectionString("default"));
+    }
+
+    /* For to save Student data */
+    private bool IsRegisterButtonDisabled => string.IsNullOrWhiteSpace(students.Name) ||
+                                             string.IsNullOrWhiteSpace(students.ClassName) ||
+                                             string.IsNullOrWhiteSpace(students.DivName);
+
+    private StudentModel students = new StudentModel();
+    private async Task InsertUserInputData()
+    {
+        string sql = "INSERT INTO student (Name, ClassName, `DivName`) VALUES (@Name, @Class, @Div);";
+        var parameters = new { Name = students.Name, Class = students.ClassName, Div = students.DivName };
+        await _data.SaveData(sql, parameters, _config.GetConnectionString("default"));
+
+        // Reload data or perform other actions after saving
+        await OnInitializedAsync();
+        // Reset the form fields
+        students = new StudentModel();
+    }
+
+    /* edit the student record*/
+    private int editedStudentId = -1;
+    private StudentModel editedStudent = new StudentModel();
+    private void StartEdit(StudentModel student)
+    {
+        editedStudentId = student.Id;
+        editedStudent = student.Clone();
+    }
+
+    private async Task SaveUpdatedData(int id)
+    {
+        string sql = "update student set Name = @Name, ClassName = @ClassName, DivName = @DivName where Id = @Id;";
+        await _data.SaveData(sql, new { Id = id, Name = editedStudent.Name, ClassName = editedStudent.ClassName, DivName = editedStudent.DivName }, _config.GetConnectionString("default"));
+        editedStudentId = -1;
+        await OnInitializedAsync();
+    }
+
+    private void CancelEdit()
+    {
+        editedStudentId = -1;
+    }
+
+    /* Delete the record */
+    private async Task DeleteData(int id)
+    {
+        string sql = "delete from student where Id = @Id;";
+        var parameters = new { Id = id };
+        await _data.SaveData(sql, parameters, _config.GetConnectionString("default"));
+        await OnInitializedAsync();
+    }
+
+
+}
